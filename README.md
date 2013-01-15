@@ -1,4 +1,0 @@
-doubanPlayer
-============
-
-Douban FM Downlaoder
