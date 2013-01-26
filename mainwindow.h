@@ -14,6 +14,7 @@
 
 #include <QMainWindow>
 #include <phonon/audiooutput.h>
+#include <phonon/audiodataoutput.h>
 #include <phonon/seekslider.h>
 #include <phonon/mediaobject.h>
 #include <phonon/volumeslider.h>
@@ -47,8 +48,10 @@ private slots:
     void sourceChanged(const Phonon::MediaSource &source);
     void aboutToFinish();
 
-    void processPlaylist();
+    void processPlaylist(bool);
     void processPicture();
+
+    void getFinished(bool error);
 //![1]
 
 private:
@@ -57,12 +60,12 @@ private:
     void setupUi();
     void setupPlaylist(const char);
     void startPlaylist();
+    void startDownload();
     QByteArray setHttpArguments(const char);
 
 //![2]
     Phonon::SeekSlider *seekSlider;
     Phonon::MediaObject *mediaObject;
-    Phonon::MediaObject *metaInformationResolver;
     Phonon::AudioOutput *audioOutput;
     Phonon::VolumeSlider *volumeSlider;
     QList<Phonon::MediaSource> sources;
@@ -79,7 +82,6 @@ private:
     QList<QString> album;
     QList<QString> sid;
     QList<QString> type; //this is user operation type, not directly from server
-
 };
 
 #endif

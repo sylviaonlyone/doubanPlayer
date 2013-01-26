@@ -12,7 +12,6 @@
 #include <QtGui>
 #include "mainwindow.h"
 
-//![1]
 int main(int argv, char **args)
 {
     QApplication app(argv, args);
@@ -27,4 +26,3 @@ int main(int argv, char **args)
 #endif   
     return app.exec(); 
 }
-//![1]

@@ -25,4 +25,6 @@ CONFIG += debug
 CONFIG(release, debug|release) {
      release: DEFINES += NDEBUG USER_NO_DEBUG _DISABLE_LOG_
 }
-
+CONFIG(debug, debug|release) {
+     debug:   DEFINES += _DEBUG_
+}

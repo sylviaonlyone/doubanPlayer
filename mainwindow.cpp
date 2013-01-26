@@ -2,7 +2,7 @@
 * Filename:  mainwindow.cpp
 * Description: Define main window display, functionality
 * Version:  0.1
-* Created:  05/15/2011
+* Created:  15/05/2011
 * Revision: none
 * Compiler: QT
 * Author:   Mason Zhang
@@ -16,8 +16,8 @@
 #include <iostream>
 #include "mainwindow.h"
 
-#define RAND_RANGE 10
-#define DECIMAL_RANGE 17
+#define RAND_RANGE 16
+#define DECIMAL_RANGE 10
 #define DOUBAN_URL "http://douban.fm/j/mine/playlist"
 #define ALBUM_PICTURE "picture.jpg"
 #define PLAYLIST "playlist"
@@ -46,18 +46,22 @@ MainWindow::MainWindow()
     connect(mediaObject, SIGNAL(currentSourceChanged(Phonon::MediaSource)),
             this, SLOT(sourceChanged(Phonon::MediaSource)));
     connect(mediaObject, SIGNAL(aboutToFinish()), this, SLOT(aboutToFinish()));
-    connect(pHttpReqestLong, SIGNAL(finished()), this, SLOT(processPlaylist()));
-    connect(pHttpGet, SIGNAL(finished()), this, SLOT(processPicture()));
+    connect(pHttpReqestLong, SIGNAL(finished(bool)), this, SLOT(processPlaylist(bool)));
+    connect(pHttpGet, SIGNAL(finished(bool)), this, SLOT(getFinished(bool)));
 
     Phonon::createPath(mediaObject, audioOutput);
 
     setupActions();
     setupUi();
+    cout<<"reuest new playlist"<<endl;
     setupPlaylist('n');
 }
 
-void MainWindow::stateChanged(Phonon::State newState, Phonon::State /* oldState */)
+void MainWindow::stateChanged(Phonon::State newState, Phonon::State oldState)
 {
+#ifdef _DEBUG_
+    cout<<"From "<<oldState<<" To "<<newState<<endl;
+#else
     switch (newState) {
         case Phonon::ErrorState:
             if (mediaObject->errorType() == Phonon::FatalError) {
@@ -80,7 +84,8 @@ void MainWindow::stateChanged(Phonon::State newState, Phonon::State /* oldState 
     //cout<<index<<qPrintable(title[index])<<endl;
     mainUi.titleLabel->setText(title[index]);
 
-    pHttpGet->HttpGet(picture[index]);
+    //pHttpGet->HttpGet(picture[index]);
+#endif
 }
 
 void MainWindow::processPicture()
@@ -94,23 +99,36 @@ void MainWindow::processPicture()
     mediaObject->play();
 }
 
-//![11]
+//!call back of Http get finished signal
+void MainWindow::getFinished(bool error)
+{
+    if(error)
+    {
+        cerr<<"Http request error!"<<endl;
+        return;
+    }
+
+    startDownload();
+}
+
+//!
 void MainWindow::tick(qint64 time)
 {
     QTime displayTime(0, (time / 60000) % 60, (time / 1000) % 60);
 
     mainUi.timeLcd->display(displayTime.toString("mm:ss"));
 }
-//![11]
 
-//![13]
+//!
 void MainWindow::sourceChanged(const Phonon::MediaSource &source)
 {
+#ifndef _DEBUG_
+    cout<<"sourceChanged"<<endl;
+#endif
     mainUi.timeLcd->display("00:00");
 }
-//![13]
 
-//![16]
+//!
 void MainWindow::aboutToFinish()
 {
     int index = sources.indexOf(mediaObject->currentSource());
@@ -166,27 +184,19 @@ QByteArray MainWindow::setHttpArguments(const char opType)
     uid=26636761&
     h=491899:r&
     du=9&
-    channel=0&res*/
+    channel=0&res
+    
+    type:n
+    sid:
+    pt:0.0
+    channel:1001853
+    from:mainsite
+    r:b310166935
+http://douban.fm/j/mine/playlist?type=e&sid=1451667&channel=1002048&pt=250.2&pb=64&from=mainsite&r=d451e382de
+    */
     QByteArray arg;
 
-    //get r, a 17 random digial string
-    QTime midnight(0, 0, 0);
-    qsrand(midnight.secsTo(QTime::currentTime()));
-
-    if(randomUID == 0)
-    {
-      randomUID = "r=0.";
-
-      for(int i = 0; i < DECIMAL_RANGE; i++)
-      {
-        QString ch;
-        ch.setNum(qrand()%RAND_RANGE);
-        randomUID += ch;
-      }
-    }
-    arg += randomUID;
-
-    /*get type, including
+    /*set type, including
     p: playing(?), all songs played, need a new list
     r: rated(?), like current song
     u: unrate, unlike current song
@@ -195,13 +205,44 @@ QByteArray MainWindow::setHttpArguments(const char opType)
     e: end, current song end playing
     n: new, return a new list
     */
-    arg += "&type=";
+    arg += "type=";
     arg += opType;
+    arg +="&";
+
+    //set sid
+    arg += "sid=&";
+
+    //set hard code to a valid channel
+    arg += "channel=1002048&";
+
+    //set pt(passed time?)
+    arg += "pt=0.0&";
+
+    //set from to main web site
+    arg += "from=mainsite&";
+
+    //set r, a 10 hex string
+    QTime midnight(0, 0, 0);
+    qsrand(midnight.secsTo(QTime::currentTime()));
+
+    if(randomUID == 0)
+    {
+      randomUID = "r=";
+
+      for(int i = 0; i < DECIMAL_RANGE; i++)
+      {
+        QString ch;
+        // need a hex char
+        ch.setNum(qrand()%RAND_RANGE, RAND_RANGE);
+        randomUID += ch;
+      }
+    }
+    arg += randomUID;
 
     switch(opType)
     {
     case 'n':
-        arg += "&h=";
+    //    arg += "&h=";
         break;
     case 's':
     case 'e':
@@ -210,23 +251,20 @@ QByteArray MainWindow::setHttpArguments(const char opType)
         int index = sources.indexOf(mediaObject->currentSource());
         arg += "&sid=" + sid[index];
 
-        if(opType == 's' || opType == 'p')
-        {
-            //|sid:type
-            arg += "&h=";
-            for(int i = 0; i <= index; i++)
-            {
-                arg += "|" + sid[i] + ":" + type[i];
-            }
-        }
+        //if(opType == 's' || opType == 'p')
+        //{
+        //    //|sid:type
+        //    arg += "&h=";
+        //    for(int i = 0; i <= index; i++)
+        //    {
+        //        arg += "|" + sid[i] + ":" + type[i];
+        //    }
+        //}
         break;
     }
     default:
         break;
     }
-
-    //set hard code to english music channel
-    arg += "&channel=2";
 
     return arg;
 }
@@ -239,16 +277,21 @@ QByteArray MainWindow::setHttpArguments(const char opType)
 */
 void MainWindow::setupPlaylist(const char type)
 {
-
+#ifdef _DEBUG_
     //Get play list
     pHttpReqestLong->HttpRequest(QUrl(DOUBAN_URL), setHttpArguments(type));
 
-    //processPlaylist();
-
+#endif
+#ifndef _DEBUG_
+    processPlaylist(false);
+#endif
 }
 
-void MainWindow::processPlaylist()
+void MainWindow::processPlaylist(bool error)
 {
+    cout<<"get playlist, start processing list"<<endl;
+    if (error) return;
+
     //check playlist file
     QFile *pPlaylist = new QFile(PLAYLIST);
 
@@ -271,7 +314,9 @@ void MainWindow::processPlaylist()
         indexStart += 7;
         indexEnd = content.indexOf(",", indexStart) - 1;
         QUrl mp3Url = QUrl(content.mid(indexStart, indexEnd-indexStart));
-
+#ifdef _DEBUG_
+        cout<<content.mid(indexStart, indexEnd-indexStart).constData()<<endl;
+#endif
         url.append(mp3Url);
 
         //init type
@@ -287,6 +332,9 @@ void MainWindow::processPlaylist()
         indexEnd = content.indexOf(",", indexStart) - 1;
         QString mp3Title = QString(content.mid(indexStart, indexEnd-indexStart));
 
+#ifndef _DEBUG_
+        cout<<mp3Title.toAscii().constData()<<endl;
+#endif
         title.append(mp3Title); 
     }
 
@@ -298,7 +346,9 @@ void MainWindow::processPlaylist()
         indexStart += 14;
         indexEnd = content.indexOf(",", indexStart) - 1;
         QString mp3Year = QString(content.mid(indexStart, indexEnd-indexStart));
-
+#ifndef _DEBUG_
+        cout<<mp3Year.toAscii().constData()<<endl;
+#endif
         year.append(mp3Year);
     }
 
@@ -310,7 +360,9 @@ void MainWindow::processPlaylist()
         indexStart += 13;
         indexEnd = content.indexOf(",", indexStart) - 1;
         QString mp3Album = QString(content.mid(indexStart, indexEnd-indexStart));
-
+#ifndef _DEBUG_
+        cout<<mp3Album.toAscii().constData()<<endl;
+#endif
         album.append(mp3Album);
     }
 
@@ -322,7 +374,9 @@ void MainWindow::processPlaylist()
         indexStart += 9;
         indexEnd = content.indexOf(",", indexStart) - 1;
         QString mp3Artist = QString(content.mid(indexStart, indexEnd-indexStart));
-
+#ifdef _DEBUG_
+        cout<<mp3Artist.toAscii().constData()<<endl;
+#endif
         artist.append(mp3Artist);
     }
 
@@ -334,7 +388,9 @@ void MainWindow::processPlaylist()
         indexStart += 10;
         indexEnd = content.indexOf(",", indexStart) - 1;
         QString pic = QString(content.mid(indexStart, indexEnd-indexStart));
-
+#ifndef _DEBUG_
+        cout<<pic.toAscii().constData()<<endl;
+#endif
         picture.append(pic);
     }
 
@@ -346,7 +402,9 @@ void MainWindow::processPlaylist()
         indexStart += 7;
         indexEnd = content.indexOf(",", indexStart) - 1;
         QString id = QString(content.mid(indexStart, indexEnd-indexStart));
-
+#ifdef _DEBUG_
+        cout<<id.toAscii().constData()<<endl;
+#endif
         sid.append(id);
     }
 
@@ -354,7 +412,8 @@ void MainWindow::processPlaylist()
     delete pPlaylist;
     pPlaylist = 0;
 
-    startPlaylist();
+    startDownload();
+    //startPlaylist();
 }
 
 void MainWindow::startPlaylist()
@@ -366,7 +425,40 @@ void MainWindow::startPlaylist()
         sources.append(source);
     }
 
-    mediaObject->setCurrentSource(sources[0]);
+    //mediaObject->stop();
+    //mediaObject->clearQueue();
+
+    //mediaObject->setCurrentSource(QString("http://robtowns.com/music/blind_willie.mp3"));
+    mediaObject->setCurrentSource(QString("/home/oasis/viva_la_vida.mp3"));
+    //mediaObject->play();
+    //mediaObject->setCurrentSource(sources[0]);
+}
+
+//Save mp3 files to local path, then play files
+void MainWindow::startDownload()
+{
+    static QList<QUrl>::const_iterator urlIter = url.begin();
+    static QList<QString>::const_iterator titleIter = title.begin();
+
+    if((*urlIter).isEmpty() || !(*urlIter).isValid() || (*titleIter).isEmpty())
+    {
+        cerr<<"Input URL or Title invalid!"<<endl;
+        return;
+    }
+
+    if(urlIter != url.end() && titleIter != title.end())
+    {
+        cout<<"dowloading mp3 "<<(*titleIter).toAscii().constData()<<endl;
+
+        QFileInfo fileInfo((*urlIter).path());
+        QString fileName = fileInfo.fileName();
+        pHttpGet->HttpGet(*urlIter, fileName);
+    }
+    else
+    {
+        ++urlIter;
+        ++titleIter;
+    }
 }
 
 void MainWindow::on_nextButton_released()
@@ -405,5 +497,5 @@ MainWindow::~MainWindow()
 
     QFile files;
     files.remove(ALBUM_PICTURE);  //remove picture.jpg
-    files.remove(PLAYLIST);       //remove playlist
+    //files.remove(PLAYLIST);       //remove playlist
 }

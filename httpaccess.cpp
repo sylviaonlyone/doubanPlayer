@@ -29,19 +29,23 @@ HttpAccess::HttpAccess(QObject *parent) : QObject(parent), iRequestId(0), iGetId
     connect(pHttp, SIGNAL(done(bool)), this, SLOT(done(bool)));
 }
 
-void HttpAccess::HttpRequest(const QUrl url, const QByteArray data)
+void HttpAccess::HttpRequest(const QUrl& url, const QByteArray& data)
 {
     QFileInfo fileInfo(url.path());
     QString fileName = fileInfo.fileName();
     if(fileName.isEmpty())
+    {
+        cerr<<fileName.toAscii().constData()<<" is empty"<<endl;
         return;        
+    }
 
-    pFile = new QFile(fileName);
+
+    QFile *pFile = new QFile(fileName);
     if(!pFile->open(QIODevice::WriteOnly))
     {
         cerr<<"Unable to save the file"<<endl;
         delete pFile;
-        pFile = 0;
+        pFile = NULL;
         return;
     }
 
@@ -51,18 +55,26 @@ void HttpAccess::HttpRequest(const QUrl url, const QByteArray data)
     QHttpRequestHeader header("POST", url.path());
 
     pHttp->setHost(url.host(), url.port(80));
-    header.setValue("Content-Type", "application/x-www-form-urlencoded");
+    //obsolete Content-Type
+    //header.setValue("Content-Type", "application/x-www-form-urlencoded");
+    header.setValue("Content-Type", "application/json; charset=utf-8");
     header.setValue("Host", url.host());
 
     cout<<"Request para: "<<data.data()<<endl;
     iRequestId = pHttp->request(header,data,pFile);
-
+    fileVect<<pFile;
     pHttp->close();
 }
 
-void HttpAccess::HttpGet(const QUrl url)
+void HttpAccess::HttpGet(const QUrl& url, const QString& name)
 {
-    pFile = new QFile(ALBUM_PICTURE);
+    QFileInfo file(name);
+    if (file.exists())
+    {
+        emit finished(false);
+        return;
+    }
+    QFile* pFile = new QFile(name);
     if(!pFile->open(QIODevice::WriteOnly))
     {
         cerr<<"Unable to save the file"<<endl;
@@ -75,6 +87,7 @@ void HttpAccess::HttpGet(const QUrl url)
     //cout<<"Http Get host "<<qPrintable(url.host())<<endl;
     //cout<<"Http Get path"<<qPrintable(url.path())<<endl;
     iGetId = pHttp->get(url.path(), pFile);
+    fileVect<<pFile;
     pHttp->close();
 }
 
@@ -84,26 +97,39 @@ void HttpAccess::done(bool error)
      {
          cerr<<"Error: "<<qPrintable(pHttp->errorString())<<endl;
      }
+     else
+     {
+         cout<<"Request Done"<<endl;
+     }
 
-     pFile->close();
-     delete pFile;
-     pFile = 0;
+     for(int i = 0; i < fileVect.size(); i++)
+     {
+         QFile* p = fileVect.at(i);
+         if (p !=NULL)
+         {
+            p->close();
+            delete p;
+            p = NULL;
+         }
+     }
 
-     emit finished();
+     fileVect.clear();
+
+     emit finished(error);
  }
 
 void HttpAccess::requestStarted(int id)
- {
+{
 
     if(id == iRequestId)
-     {
-         cout<<"Request started"<<endl;
-     }
-     else if (id == iGetId)
-            {
-            cout<<"Get started"<<endl;
+    {
+        cout<<"Request started"<<endl;
+    }
+    else if (id == iGetId)
+    {
+        cout<<"Get started"<<endl;
+    }
 }
- }
 
 void HttpAccess::readyRead(const QHttpResponseHeader& resp)
 {
@@ -126,7 +152,6 @@ void HttpAccess::readyRead(const QHttpResponseHeader& resp)
     }
     return;
 }
-
 
 HttpAccess::~HttpAccess()
 {
