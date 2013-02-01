@@ -12,6 +12,7 @@
 #include <iostream>
 #include <QFileInfo>
 #include <QHttpRequestHeader>
+#include <QHttpResponseHeader>
 #include <QByteArray>
 #include "httpaccess.h"
 
@@ -24,9 +25,10 @@ HttpAccess::HttpAccess(QObject *parent) : QObject(parent), iRequestId(0), iGetId
     pHttp = new QHttp(this);
 
     connect(pHttp,SIGNAL(requestStarted(int)), this, SLOT(requestStarted(int)));
-    connect(pHttp,SIGNAL(readyRead(const QHttpResponseHeader&)), this,
-                        SLOT(readyRead(const QHttpResponseHeader&)));
+    connect(pHttp,SIGNAL(readyRead(const QHttpResponseHeader&)),
+            this, SLOT(readyRead(const QHttpResponseHeader&)));
     connect(pHttp, SIGNAL(done(bool)), this, SLOT(done(bool)));
+    connect(pHttp, SIGNAL(stateChanged(int)), this, SLOT(stateChanged(int)));
 }
 
 void HttpAccess::HttpRequest(const QUrl& url, const QByteArray& data)
@@ -71,7 +73,8 @@ void HttpAccess::HttpGet(const QUrl& url, const QString& name)
     QFileInfo file(name);
     if (file.exists())
     {
-        emit finished(false);
+        cerr<<name.toUtf8().constData()<<" exist!"<<endl;
+        emit finished(true);
         return;
     }
     QFile* pFile = new QFile(name);
@@ -82,10 +85,11 @@ void HttpAccess::HttpGet(const QUrl& url, const QString& name)
         pFile = 0;
         return;
     }
+    cout<<"Getting "<<name.toUtf8().constData()<<endl;
 
     pHttp->setHost(url.host());
-    //cout<<"Http Get host "<<qPrintable(url.host())<<endl;
-    //cout<<"Http Get path"<<qPrintable(url.path())<<endl;
+    cout<<"Http Get host "<<qPrintable(url.host())<<endl;
+    cout<<"Http Get path"<<qPrintable(url.path())<<endl;
     iGetId = pHttp->get(url.path(), pFile);
     fileVect<<pFile;
     pHttp->close();
@@ -121,6 +125,7 @@ void HttpAccess::done(bool error)
 void HttpAccess::requestStarted(int id)
 {
 
+    //cout<<"bytesAvailable "<<pHttp->bytesAvailable()<<endl;
     if(id == iRequestId)
     {
         cout<<"Request started"<<endl;
@@ -151,6 +156,36 @@ void HttpAccess::readyRead(const QHttpResponseHeader& resp)
         cerr<<"error occurs on reading"<<endl;
     }
     return;
+}
+
+void HttpAccess::stateChanged(int state)
+{
+#if 0
+    switch(state)
+    {
+      case QHttp::Unconnected:
+        cout<<"unconnected"<<endl;
+      break;
+      case QHttp::HostLookup:
+        cout<<"HostLookup"<<endl;
+      break;
+      case QHttp::Connecting:
+        cout<<"Connecting"<<endl;
+      break;
+      case QHttp::Sending:
+        cout<<"Sending"<<endl;
+      break;
+      case QHttp::Connected:
+        cout<<"Connected"<<endl;
+      break;
+      case QHttp::Closing:
+        cout<<"Closing"<<endl;
+      break;
+      default:
+        cout<<"unknown state!"<<endl;
+      break;
+    }
+#endif
 }
 
 HttpAccess::~HttpAccess()

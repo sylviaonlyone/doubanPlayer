@@ -20,6 +20,7 @@
 #include <phonon/volumeslider.h>
 #include <phonon/backendcapabilities.h>
 #include <QList>
+#include <QtGlobal>
 
 #include "httpaccess.h"
 #include "ui_mainwindow.h"
@@ -52,9 +53,9 @@ private slots:
     void processPicture();
 
     void getFinished(bool error);
-//![1]
 
 private:
+//!UI objects
     Ui::MainWindow mainUi;
     void setupActions();
     void setupUi();
@@ -63,14 +64,13 @@ private:
     void startDownload();
     QByteArray setHttpArguments(const char);
 
-//![2]
+//!Phonon objects
     Phonon::SeekSlider *seekSlider;
     Phonon::MediaObject *mediaObject;
     Phonon::AudioOutput *audioOutput;
     Phonon::VolumeSlider *volumeSlider;
     QList<Phonon::MediaSource> sources;
-//![2]
-
+//!Playlist data objects
     HttpAccess *pHttpReqestLong;    //send long request, will receive a playlist
     HttpAccess *pHttpReqestShort;   //send short request, nothing recieve
     HttpAccess *pHttpGet;           //get data from URL
@@ -82,6 +82,10 @@ private:
     QList<QString> album;
     QList<QString> sid;
     QList<QString> type; //this is user operation type, not directly from server
+    QList<quint16> length; //length in seconds
+
+//!misc objects
+    QString currentFile;
 };
 
 #endif

@@ -37,6 +37,7 @@ private slots:
     void done(bool error);
     void requestStarted(int id);
     void readyRead(const QHttpResponseHeader& resp);
+    void stateChanged(int state);
 private:
     QHttp *pHttp;
     //there could be multiple requests coming at same time

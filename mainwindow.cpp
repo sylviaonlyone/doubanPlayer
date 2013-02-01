@@ -29,6 +29,7 @@ static QString randomUID = 0;
 
 
 MainWindow::MainWindow()
+  : currentFile("")
 {
     mainUi.setupUi(this);
     audioOutput = new Phonon::AudioOutput(Phonon::MusicCategory, this);
@@ -53,8 +54,10 @@ MainWindow::MainWindow()
 
     setupActions();
     setupUi();
-    cout<<"reuest new playlist"<<endl;
-    setupPlaylist('n');
+    //setupPlaylist('n');
+        pHttpGet->HttpGet(QUrl(QString("http://robtowns.com/music/blind_willie.mp3")),
+                          QString("blind_willie.mp3"));
+
 }
 
 void MainWindow::stateChanged(Phonon::State newState, Phonon::State oldState)
@@ -108,6 +111,8 @@ void MainWindow::getFinished(bool error)
         return;
     }
 
+    cout<<"Get finished, playing"<<endl;
+    startPlaylist();
     startDownload();
 }
 
@@ -122,7 +127,7 @@ void MainWindow::tick(qint64 time)
 //!
 void MainWindow::sourceChanged(const Phonon::MediaSource &source)
 {
-#ifndef _DEBUG_
+#ifdef _DEBUG_
     cout<<"sourceChanged"<<endl;
 #endif
     mainUi.timeLcd->display("00:00");
@@ -131,6 +136,7 @@ void MainWindow::sourceChanged(const Phonon::MediaSource &source)
 //!
 void MainWindow::aboutToFinish()
 {
+    cout<<"Play about to finish!"<<endl;
     int index = sources.indexOf(mediaObject->currentSource());
 
     //set current song operation type to 'p' (playing)
@@ -188,11 +194,12 @@ QByteArray MainWindow::setHttpArguments(const char opType)
     
     type:n
     sid:
-    pt:0.0
+    pt:0.0    passed time?
+    pb:64     passed bits?
     channel:1001853
     from:mainsite
     r:b310166935
-http://douban.fm/j/mine/playlist?type=e&sid=1451667&channel=1002048&pt=250.2&pb=64&from=mainsite&r=d451e382de
+    http://douban.fm/j/mine/playlist?type=e&sid=1451667&channel=1002048&pt=250.2&pb=64&from=mainsite&r=d451e382de
     */
     QByteArray arg;
 
@@ -210,16 +217,52 @@ http://douban.fm/j/mine/playlist?type=e&sid=1451667&channel=1002048&pt=250.2&pb=
     arg +="&";
 
     //set sid
-    arg += "sid=&";
+    if ('n' == opType)
+    {
+    }
 
     //set hard code to a valid channel
-    arg += "channel=1002048&";
-
-    //set pt(passed time?)
-    arg += "pt=0.0&";
+    //1000947 : So quit to sleep 
+    arg += "channel=1000947&";
 
     //set from to main web site
     arg += "from=mainsite&";
+
+    switch(opType)
+    {
+      case 'n':
+      {
+        arg += "sid=&";
+        //set pt(passed time?)
+        arg += "pt=0.0&";
+      }
+      break;
+      case 's':
+      case 'e':
+      case 'p':
+      {
+          int index = sources.indexOf(mediaObject->currentSource());
+          arg += "sid=" + sid[index];
+          arg += "&";
+
+          arg += "pt=" + length[index];
+          arg += "&";
+
+          arg += "pb=64&";
+          //if(opType == 's' || opType == 'p')
+          //{
+          //    //|sid:type
+          //    arg += "&h=";
+          //    for(int i = 0; i <= index; i++)
+          //    {
+          //        arg += "|" + sid[i] + ":" + type[i];
+          //    }
+          //}
+      }
+      break;
+      default:
+        break;
+    }
 
     //set r, a 10 hex string
     QTime midnight(0, 0, 0);
@@ -239,33 +282,6 @@ http://douban.fm/j/mine/playlist?type=e&sid=1451667&channel=1002048&pt=250.2&pb=
     }
     arg += randomUID;
 
-    switch(opType)
-    {
-    case 'n':
-    //    arg += "&h=";
-        break;
-    case 's':
-    case 'e':
-    case 'p':
-    {
-        int index = sources.indexOf(mediaObject->currentSource());
-        arg += "&sid=" + sid[index];
-
-        //if(opType == 's' || opType == 'p')
-        //{
-        //    //|sid:type
-        //    arg += "&h=";
-        //    for(int i = 0; i <= index; i++)
-        //    {
-        //        arg += "|" + sid[i] + ":" + type[i];
-        //    }
-        //}
-        break;
-    }
-    default:
-        break;
-    }
-
     return arg;
 }
 
@@ -280,7 +296,6 @@ void MainWindow::setupPlaylist(const char type)
 #ifdef _DEBUG_
     //Get play list
     pHttpReqestLong->HttpRequest(QUrl(DOUBAN_URL), setHttpArguments(type));
-
 #endif
 #ifndef _DEBUG_
     processPlaylist(false);
@@ -289,7 +304,6 @@ void MainWindow::setupPlaylist(const char type)
 
 void MainWindow::processPlaylist(bool error)
 {
-    cout<<"get playlist, start processing list"<<endl;
     if (error) return;
 
     //check playlist file
@@ -314,7 +328,7 @@ void MainWindow::processPlaylist(bool error)
         indexStart += 7;
         indexEnd = content.indexOf(",", indexStart) - 1;
         QUrl mp3Url = QUrl(content.mid(indexStart, indexEnd-indexStart));
-#ifdef _DEBUG_
+#ifndef _DEBUG_
         cout<<content.mid(indexStart, indexEnd-indexStart).constData()<<endl;
 #endif
         url.append(mp3Url);
@@ -330,9 +344,9 @@ void MainWindow::processPlaylist(bool error)
     {
         indexStart += 9;
         indexEnd = content.indexOf(",", indexStart) - 1;
-        QString mp3Title = QString(content.mid(indexStart, indexEnd-indexStart));
+        QString mp3Title = QString::fromUtf8(content.mid(indexStart, indexEnd-indexStart).constData());
 
-#ifndef _DEBUG_
+#ifdef _DEBUG_
         cout<<mp3Title.toAscii().constData()<<endl;
 #endif
         title.append(mp3Title); 
@@ -373,8 +387,8 @@ void MainWindow::processPlaylist(bool error)
     {
         indexStart += 9;
         indexEnd = content.indexOf(",", indexStart) - 1;
-        QString mp3Artist = QString(content.mid(indexStart, indexEnd-indexStart));
-#ifdef _DEBUG_
+        QString mp3Artist = QString::fromUtf8(content.mid(indexStart, indexEnd-indexStart));
+#ifndef _DEBUG_
         cout<<mp3Artist.toAscii().constData()<<endl;
 #endif
         artist.append(mp3Artist);
@@ -388,8 +402,8 @@ void MainWindow::processPlaylist(bool error)
         indexStart += 10;
         indexEnd = content.indexOf(",", indexStart) - 1;
         QString pic = QString(content.mid(indexStart, indexEnd-indexStart));
-#ifndef _DEBUG_
-        cout<<pic.toAscii().constData()<<endl;
+#ifdef _DEBUG_
+        //cout<<pic.toAscii().constData()<<endl;
 #endif
         picture.append(pic);
     }
@@ -402,10 +416,25 @@ void MainWindow::processPlaylist(bool error)
         indexStart += 7;
         indexEnd = content.indexOf(",", indexStart) - 1;
         QString id = QString(content.mid(indexStart, indexEnd-indexStart));
-#ifdef _DEBUG_
+#ifndef _DEBUG_
         cout<<id.toAscii().constData()<<endl;
 #endif
         sid.append(id);
+    }
+
+    //find length in seconds
+    indexStart = 0, indexEnd = 0;
+
+    while ((indexStart = content.indexOf("\"length\"", indexStart)) != -1)
+    {
+        indexStart += 9;
+        indexEnd = content.indexOf(",", indexStart);
+        QString len = QString(content.mid(indexStart, indexEnd-indexStart));
+#ifndef _DEBUG_
+        cout<<len.toAscii().constData()<<endl;
+#endif
+        bool ok;
+        length.append(len.toUShort(&ok));
     }
 
     pPlaylist->close();
@@ -413,25 +442,17 @@ void MainWindow::processPlaylist(bool error)
     pPlaylist = 0;
 
     startDownload();
-    //startPlaylist();
 }
 
 void MainWindow::startPlaylist()
 {
-    QList<QUrl>::const_iterator iter;
-    for(iter = url.begin(); iter != url.end();++iter)
+    QFileInfo file(currentFile);
+    if (!currentFile.isEmpty() && file.exists())
     {
-        Phonon::MediaSource source(*iter);
-        sources.append(source);
+        mediaObject->setCurrentSource(currentFile);
+        cout<<"media name: "<<mediaObject->currentSource().fileName().toUtf8().constData()<<endl;
+        mediaObject->play();
     }
-
-    //mediaObject->stop();
-    //mediaObject->clearQueue();
-
-    //mediaObject->setCurrentSource(QString("http://robtowns.com/music/blind_willie.mp3"));
-    mediaObject->setCurrentSource(QString("/home/oasis/viva_la_vida.mp3"));
-    //mediaObject->play();
-    //mediaObject->setCurrentSource(sources[0]);
 }
 
 //Save mp3 files to local path, then play files
@@ -448,14 +469,14 @@ void MainWindow::startDownload()
 
     if(urlIter != url.end() && titleIter != title.end())
     {
-        cout<<"dowloading mp3 "<<(*titleIter).toAscii().constData()<<endl;
+        //QUrl url(QString("http://robtowns.com/music/blind_willie.mp3"));
+        //cout<<"dowloading mp3 "<<(*titleIter).toAscii().constData()<<endl;
 
-        QFileInfo fileInfo((*urlIter).path());
-        QString fileName = fileInfo.fileName();
-        pHttpGet->HttpGet(*urlIter, fileName);
-    }
-    else
-    {
+        currentFile = (*titleIter) + QString(".mp3");
+        pHttpGet->HttpGet(*urlIter, currentFile);
+        //pHttpGet->HttpGet(QUrl(QString("http://robtowns.com/music/blind_willie.mp3")),
+        //                  QString("blind_willie.mp3"));
+
         ++urlIter;
         ++titleIter;
     }
