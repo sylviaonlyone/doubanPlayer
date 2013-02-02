@@ -4,3 +4,17 @@ doubanPlayer
 Douban FM Downlaoder
 
 Playing source from Douban FM, also save audio streams to local files
+
+Build the code
+============
+Douban player uses Phonon library to play audio, hence Qt Phonon library is requered. You will also need Phonon Backend installed. For more details about Phonon, please look here:
+http://doc.qt.digia.com/qt/phonon-overview.html
+
+The followings are what I have done on my Ubuntu 12.04 to setup build env:
+1. install Phonon library packages includes:
+   libphonon (Phonon frontend control)
+   libphonon_dev (Phonon frontend control developing files)
+   phonon-backend-gstreamer (Phonon gstreamer backend)
+2. enable Phonon in Qt by config Qt source with:
+   ./configurate -phonon -phonon_backend
+
