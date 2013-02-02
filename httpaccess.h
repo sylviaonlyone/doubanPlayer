@@ -17,7 +17,8 @@
 #include <QHttp>
 #include <QUrl>
 #include <QString>
-#include <QVector>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
 
 class HttpAccess : public QObject{
     Q_OBJECT
@@ -38,15 +39,17 @@ private slots:
     void requestStarted(int id);
     void readyRead(const QHttpResponseHeader& resp);
     void stateChanged(int state);
+    void httpGetFinished();
+    void httpGetReadyRead();
+    void updateDataReadProgress(qint64 bytesRead, qint64 totalBytes);
 private:
-    QHttp *pHttp;
-    //there could be multiple requests coming at same time
-    //asking for files.
-    //id : request id
-    //pd : file pointer for a certain request
-    QVector<QFile*> fileVect;
+    QHttp* pHttp;
+    //assume there is only one Http request at a time,
+    //if it's not a case, we need design an alternative
     QFile *pFile;
     int iRequestId;
     int iGetId;
+    QNetworkAccessManager qnam;
+    QNetworkReply* pReply;
 };
 #endif // HTTPACCESS_H

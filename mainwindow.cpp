@@ -54,9 +54,9 @@ MainWindow::MainWindow()
 
     setupActions();
     setupUi();
-    //setupPlaylist('n');
-        pHttpGet->HttpGet(QUrl(QString("http://robtowns.com/music/blind_willie.mp3")),
-                          QString("blind_willie.mp3"));
+    setupPlaylist('n');
+    //pHttpGet->HttpGet(QUrl(QString("http://robtowns.com/music/blind_willie.mp3")),
+    //                  QString("blind_willie.mp3"));
 
 }
 
@@ -108,7 +108,7 @@ void MainWindow::getFinished(bool error)
     if(error)
     {
         cerr<<"Http request error!"<<endl;
-        return;
+        //return;
     }
 
     cout<<"Get finished, playing"<<endl;
@@ -137,25 +137,20 @@ void MainWindow::sourceChanged(const Phonon::MediaSource &source)
 void MainWindow::aboutToFinish()
 {
     cout<<"Play about to finish!"<<endl;
-    int index = sources.indexOf(mediaObject->currentSource());
-
-    //set current song operation type to 'p' (playing)
-    type[index] = 'p';
-
-    //send a message to server
     pHttpReqestShort->HttpRequest(QUrl(DOUBAN_URL), setHttpArguments('e'));
+    //int index = sources.indexOf(mediaObject->currentSource());
 
-
-    //index to next song
-    index++;
-
-    if (sources.size() > index)
-        mediaObject->setCurrentSource(sources[index]);
-    else
-        //get playlist again at the end of list
-        setupPlaylist('p');
+    ////set current song operation type to 'p' (playing)
+    //type[index] = 'p';
+    ////send a message to server
+    ////index to next song
+    //index++;
+    //if (sources.size() > index)
+    //    mediaObject->setCurrentSource(sources[index]);
+    //else
+    //    //get playlist again at the end of list
+    //    setupPlaylist('p');
 }
-//![16]
 
 void MainWindow::setupActions()
 {
@@ -449,10 +444,27 @@ void MainWindow::startPlaylist()
     QFileInfo file(currentFile);
     if (!currentFile.isEmpty() && file.exists())
     {
-        mediaObject->setCurrentSource(currentFile);
+        //if no source, set current souce, otherwise, add to queue
+        if (mediaObject->currentSource().fileName().isEmpty())
+        {
+          mediaObject->setCurrentSource(currentFile);
+          mediaObject->play();
+        }
+        else
+        {
+          mediaObject->enqueue(currentFile);
+        }
         cout<<"media name: "<<mediaObject->currentSource().fileName().toUtf8().constData()<<endl;
-        mediaObject->play();
+        //if (mediaObject->state() != Phonon::PlayingState)
+        {
+            
+        }
+        
     }
+    //else
+    //{
+    //    cerr<<"Play cannot find file:"<<currentFile.toUtf8().constData()<<endl;
+    //}
 }
 
 //Save mp3 files to local path, then play files
@@ -470,9 +482,9 @@ void MainWindow::startDownload()
     if(urlIter != url.end() && titleIter != title.end())
     {
         //QUrl url(QString("http://robtowns.com/music/blind_willie.mp3"));
-        //cout<<"dowloading mp3 "<<(*titleIter).toAscii().constData()<<endl;
 
         currentFile = (*titleIter) + QString(".mp3");
+        //cout<<"dowloading "<<currentFile.toUtf8().constData()<<endl;
         pHttpGet->HttpGet(*urlIter, currentFile);
         //pHttpGet->HttpGet(QUrl(QString("http://robtowns.com/music/blind_willie.mp3")),
         //                  QString("blind_willie.mp3"));

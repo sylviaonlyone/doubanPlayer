@@ -20,7 +20,11 @@
 
 using namespace std;
 
-HttpAccess::HttpAccess(QObject *parent) : QObject(parent), iRequestId(0), iGetId(0)
+HttpAccess::HttpAccess(QObject *parent): 
+    QObject(parent),
+    iRequestId(0),
+    iGetId(0),
+    pReply(NULL)
 {
     pHttp = new QHttp(this);
 
@@ -41,8 +45,7 @@ void HttpAccess::HttpRequest(const QUrl& url, const QByteArray& data)
         return;        
     }
 
-
-    QFile *pFile = new QFile(fileName);
+    pFile = new QFile(fileName);
     if(!pFile->open(QIODevice::WriteOnly))
     {
         cerr<<"Unable to save the file"<<endl;
@@ -64,7 +67,6 @@ void HttpAccess::HttpRequest(const QUrl& url, const QByteArray& data)
 
     cout<<"Request para: "<<data.data()<<endl;
     iRequestId = pHttp->request(header,data,pFile);
-    fileVect<<pFile;
     pHttp->close();
 }
 
@@ -77,7 +79,7 @@ void HttpAccess::HttpGet(const QUrl& url, const QString& name)
         emit finished(true);
         return;
     }
-    QFile* pFile = new QFile(name);
+    pFile = new QFile(name);
     if(!pFile->open(QIODevice::WriteOnly))
     {
         cerr<<"Unable to save the file"<<endl;
@@ -87,12 +89,19 @@ void HttpAccess::HttpGet(const QUrl& url, const QString& name)
     }
     cout<<"Getting "<<name.toUtf8().constData()<<endl;
 
-    pHttp->setHost(url.host());
+    //pHttp->setHost(url.host());
     cout<<"Http Get host "<<qPrintable(url.host())<<endl;
     cout<<"Http Get path"<<qPrintable(url.path())<<endl;
-    iGetId = pHttp->get(url.path(), pFile);
-    fileVect<<pFile;
-    pHttp->close();
+    //iGetId = pHttp->get(url.path(), pFile);
+    //pHttp->close();
+
+
+    ///////////////////
+    pReply = qnam.get(QNetworkRequest(url));
+    connect(pReply, SIGNAL(finished()), this, SLOT(httpGetFinished()));
+    connect(pReply, SIGNAL(readyRead()), this, SLOT(httpGetReadyRead()));
+    connect(pReply, SIGNAL(downloadProgress(qint64,qint64)),
+             this, SLOT(updateDataReadProgress(qint64,qint64)));
 }
 
 void HttpAccess::done(bool error)
@@ -106,18 +115,13 @@ void HttpAccess::done(bool error)
          cout<<"Request Done"<<endl;
      }
 
-     for(int i = 0; i < fileVect.size(); i++)
+     if (pFile !=NULL)
      {
-         QFile* p = fileVect.at(i);
-         if (p !=NULL)
-         {
-            p->close();
-            delete p;
-            p = NULL;
-         }
+        pFile->flush();
+        pFile->close();
+        delete pFile;
+        pFile = NULL;
      }
-
-     fileVect.clear();
 
      emit finished(error);
  }
@@ -186,6 +190,45 @@ void HttpAccess::stateChanged(int state)
       break;
     }
 #endif
+}
+
+void HttpAccess::httpGetFinished()
+{
+    //cout<<"Network reply finished"<<endl;
+    if (pFile !=NULL)
+    {
+       pFile->flush();
+       pFile->close();
+       delete pFile;
+       pFile = NULL;
+    }
+    pReply->deleteLater();
+    pReply = NULL;
+
+    //error=false
+    emit finished(false);
+}
+
+void HttpAccess::httpGetReadyRead()
+{
+    // this slot gets called every time the QNetworkReply has new data.
+    // We read all of its new data and write it into the file.
+    // That way we use less RAM than when reading it at the finished()
+    // signal of the QNetworkReply
+    if (pFile)
+        pFile->write(pReply->readAll());
+}
+
+void HttpAccess::updateDataReadProgress(qint64 bytesRead, qint64 totalBytes)
+{
+    static int prevPercent = 0; 
+    int percent = static_cast<float>(bytesRead)/static_cast<float>(totalBytes) * 100.00;
+    if (percent != prevPercent)
+    {
+        cout<<"Downloaded "<<bytesRead<<" of totalBytes "<<totalBytes<<", ";
+        cout<<percent<<"%"<<endl;
+        prevPercent = percent;
+    }
 }
 
 HttpAccess::~HttpAccess()
