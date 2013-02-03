@@ -59,10 +59,11 @@ private:
     Ui::MainWindow mainUi;
     void setupActions();
     void setupUi();
-    void setupPlaylist(const char);
+    void setupPlaylist(char);
     void startPlaylist();
     void startDownload();
     QByteArray setHttpArguments(const char);
+    void clearPlaylist();
 
 //!Phonon objects
     Phonon::SeekSlider *seekSlider;
@@ -86,6 +87,7 @@ private:
 
 //!misc objects
     QString currentFile;
+    int index; //index of current playing song [1,10]
 };
 
 #endif

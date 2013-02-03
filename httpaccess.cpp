@@ -110,10 +110,6 @@ void HttpAccess::done(bool error)
      {
          cerr<<"Error: "<<qPrintable(pHttp->errorString())<<endl;
      }
-     else
-     {
-         cout<<"Request Done"<<endl;
-     }
 
      if (pFile !=NULL)
      {
